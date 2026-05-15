@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
-import { badRequest, isEntityType, parsePositiveIntParam } from '@/lib/api'
+import {
+  badRequest,
+  isEntityType,
+  normalizeOptionalString,
+  normalizeRequiredString,
+  parseJsonBody,
+  parsePositiveIntParam,
+  requireObjectBody,
+} from '@/lib/api'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -42,35 +50,40 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = requireObjectBody(await parseJsonBody(req))
+  } catch (err) {
+    return badRequest(err instanceof Error ? err.message : 'Invalid request body')
+  }
+
   const { cik, name, type, description } = body
 
-  if (!cik || !name || !type) {
-    return NextResponse.json(
-      { error: 'cik, name, and type are required' },
-      { status: 400 },
-    )
+  let normalizedCik: string
+  let normalizedName: string
+  let normalizedDescription: string | null | undefined
+  try {
+    normalizedCik = normalizeRequiredString(cik, 'CIK', 10)
+    normalizedName = normalizeRequiredString(name, 'name')
+    normalizedDescription = normalizeOptionalString(description, 'description')
+  } catch (err) {
+    return badRequest(err instanceof Error ? err.message : 'Invalid request body')
   }
-  if (typeof cik !== 'string' || !/^\d+$/.test(cik)) {
-    return badRequest('CIK must be numeric')
-  }
-  if (typeof name !== 'string' || name.trim().length === 0) {
-    return badRequest('name must be a non-empty string')
+
+  if (!/^\d{1,10}$/.test(normalizedCik)) {
+    return badRequest('CIK must be numeric and contain 10 or fewer digits')
   }
   if (!isEntityType(type)) {
     return badRequest('type must be PERSON or COMPANY')
-  }
-  if (description !== undefined && typeof description !== 'string') {
-    return badRequest('description must be a string')
   }
 
   try {
     const entity = await prisma.entity.create({
       data: {
-        cik,
-        name: name.trim(),
+        cik: normalizedCik,
+        name: normalizedName,
         type,
-        description: description?.trim() || null,
+        description: normalizedDescription ?? null,
         tracked: true,
       },
     })

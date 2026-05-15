@@ -5,6 +5,10 @@ import {
   FORM_TYPES,
   isFormType,
   isNotificationType,
+  normalizeEmailAddress,
+  normalizeNtfyTopic,
+  parseJsonBody,
+  requireObjectBody,
 } from '@/lib/api'
 
 export async function GET() {
@@ -16,7 +20,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = requireObjectBody(await parseJsonBody(req))
+  } catch (err) {
+    return badRequest(err instanceof Error ? err.message : 'Invalid request body')
+  }
+
   const { type, endpoint, entityId, formTypes } = body
 
   if (!type || !endpoint) {
@@ -26,16 +36,24 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  if (typeof endpoint !== 'string' || endpoint.trim().length === 0) {
-    return badRequest('endpoint must be a non-empty string')
+  if (typeof endpoint !== 'string') {
+    return badRequest('endpoint must be a string')
   }
 
   if (!isNotificationType(type)) {
     return badRequest('type must be NTFY or EMAIL')
   }
 
-  if (type === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(endpoint)) {
-    return badRequest('Invalid email address')
+  let normalizedEndpoint: string
+  try {
+    normalizedEndpoint =
+      type === 'EMAIL' ? normalizeEmailAddress(endpoint) : normalizeNtfyTopic(endpoint)
+  } catch (err) {
+    return badRequest(err instanceof Error ? err.message : 'Invalid endpoint')
+  }
+
+  if (entityId !== undefined && entityId !== null && typeof entityId !== 'string') {
+    return badRequest('entityId must be a string or null')
   }
 
   if (
@@ -56,7 +74,7 @@ export async function POST(req: NextRequest) {
     const subscription = await prisma.subscription.create({
       data: {
         type,
-        endpoint: endpoint.trim(),
+        endpoint: normalizedEndpoint,
         entityId: entityId || null,
         formTypes: resolvedFormTypes,
         active: true,

@@ -26,13 +26,23 @@ function getTransporter(): nodemailer.Transporter {
   return _transporter
 }
 
+function rejectHeaderInjection(value: string, fieldName: string): void {
+  if (/\r|\n/.test(value)) {
+    throw new Error(`${fieldName} must not contain newline characters`)
+  }
+}
+
 export async function sendEmail(
   to: string,
   subject: string,
   html: string,
 ): Promise<void> {
+  rejectHeaderInjection(to, 'to')
+  rejectHeaderInjection(subject, 'subject')
+
   const transporter = getTransporter()
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'noreply@trade-tracker'
+  rejectHeaderInjection(from, 'from')
 
   await transporter.sendMail({ from, to, subject, html })
 }
