@@ -1,0 +1,17 @@
+{
+  "name": "trade-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
+    "db:generate": "pnpm --filter @trade-tracker/db generate",
+    "db:migrate": "pnpm --filter @trade-tracker/db migrate:dev",
+    "db:studio": "pnpm --filter @trade-tracker/db studio",
+    "worker": "pnpm --filter @trade-tracker/worker start"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

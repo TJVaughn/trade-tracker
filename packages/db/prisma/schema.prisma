@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EntityType {
+  PERSON
+  COMPANY
+}
+
+enum FormType {
+  FORM_4
+  FORM_13F
+  SCHEDULE_13DG
+}
+
+enum NotificationType {
+  NTFY
+  EMAIL
+}
+
+model Entity {
+  id            String         @id @default(cuid())
+  cik           String         @unique
+  name          String
+  type          EntityType
+  description   String?
+  tracked       Boolean        @default(true)
+  filings       Filing[]
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([tracked])
+}
+
+model Filing {
+  id              String        @id @default(cuid())
+  accessionNumber String        @unique
+  formType        FormType
+  filedAt         DateTime
+  periodOfReport  DateTime?
+  entityId        String
+  entity          Entity        @relation(fields: [entityId], references: [id])
+  issuerName      String?
+  issuerCik       String?
+  issuerTicker    String?
+  transactions    Transaction[]
+  rawUrl          String?
+  processed       Boolean       @default(false)
+  processingError String?
+  createdAt       DateTime      @default(now())
+
+  @@index([entityId])
+  @@index([formType])
+  @@index([filedAt(sort: Desc)])
+  @@index([processed])
+}
+
+model Transaction {
+  id               String   @id @default(cuid())
+  filingId         String
+  filing           Filing   @relation(fields: [filingId], references: [id], onDelete: Cascade)
+  transactionDate  DateTime
+  securityTitle    String
+  transactionCode  String
+  shares           Decimal  @db.Decimal(20, 6)
+  pricePerShare    Decimal? @db.Decimal(20, 6)
+  totalValue       Decimal? @db.Decimal(20, 2)
+  sharesOwnedAfter Decimal? @db.Decimal(20, 6)
+  ownershipForm    String
+  footnote         String?
+  createdAt        DateTime @default(now())
+
+  @@index([filingId])
+  @@index([transactionDate(sort: Desc)])
+}
+
+model Subscription {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  endpoint  String
+  entityId  String?
+  entity    Entity?          @relation(fields: [entityId], references: [id])
+  formTypes FormType[]
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model PollerState {
+  id          String    @id @default(cuid())
+  formType    FormType  @unique
+  lastChecked DateTime  @default(now())
+  lastSeenAt  DateTime?
+}
