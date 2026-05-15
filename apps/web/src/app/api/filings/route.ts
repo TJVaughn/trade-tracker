@@ -1,23 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
+import {
+  badRequest,
+  isFormType,
+  parseDateParam,
+  parsePositiveIntParam,
+} from '@/lib/api'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const entityId = searchParams.get('entityId') || undefined
   const formType = searchParams.get('formType') || undefined
-  const startDate = searchParams.get('startDate') || undefined
-  const endDate = searchParams.get('endDate') || undefined
-  const page = parseInt(searchParams.get('page') ?? '1')
-  const limit = parseInt(searchParams.get('limit') ?? '25')
+  if (formType && !isFormType(formType)) {
+    return badRequest('formType must be FORM_4, FORM_13F, or SCHEDULE_13DG')
+  }
+
+  let startDate: Date | undefined
+  let endDate: Date | undefined
+  let page: number
+  let limit: number
+  try {
+    startDate = parseDateParam(searchParams, 'startDate')
+    endDate = parseDateParam(searchParams, 'endDate')
+    page = parsePositiveIntParam(searchParams, 'page', 1)
+    limit = parsePositiveIntParam(searchParams, 'limit', 25)
+  } catch (err) {
+    return badRequest(
+      err instanceof Error ? err.message : 'Invalid query parameters',
+    )
+  }
 
   const where = {
     ...(entityId ? { entityId } : {}),
-    ...(formType ? { formType: formType as 'FORM_4' | 'FORM_13F' | 'SCHEDULE_13DG' } : {}),
+    ...(formType ? { formType } : {}),
     ...(startDate || endDate
       ? {
           filedAt: {
-            ...(startDate ? { gte: new Date(startDate) } : {}),
-            ...(endDate ? { lte: new Date(endDate) } : {}),
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
           },
         }
       : {}),
