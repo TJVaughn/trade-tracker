@@ -11,7 +11,7 @@
     "@trade-tracker/db": "workspace:*",
     "axios": "^1.7.0",
     "fast-xml-parser": "^5.7.0",
-    "nodemailer": "^6.9.0",
+    "nodemailer": "^8.0.5",
     "node-cron": "^3.0.3",
     "dotenv": "^16.4.0",
     "zod": "^3.23.0"
