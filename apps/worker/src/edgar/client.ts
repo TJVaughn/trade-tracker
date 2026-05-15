@@ -38,7 +38,15 @@ interface EftsSearchResponse {
   }
 }
 
-const EDGAR_USER_AGENT = 'TradeTracker hauck.trevor@gmail.com'
+function getEdgarUserAgent(): string {
+  const userAgent = process.env.EDGAR_USER_AGENT?.trim()
+  if (!userAgent) {
+    throw new Error(
+      'EDGAR_USER_AGENT is required and must include an app name plus contact email',
+    )
+  }
+  return userAgent
+}
 // SEC allows up to 10 req/sec; we use a 150ms floor between requests to stay safe
 const MIN_REQUEST_INTERVAL_MS = 150
 
@@ -54,7 +62,7 @@ export class EdgarClient {
 
   constructor() {
     const commonHeaders = {
-      'User-Agent': EDGAR_USER_AGENT,
+      'User-Agent': getEdgarUserAgent(),
       Accept: 'application/json',
     }
 

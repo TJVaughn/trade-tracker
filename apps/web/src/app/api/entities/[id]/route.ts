@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
+import { badRequest } from '@/lib/api'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -35,9 +36,24 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const { name, description, tracked } = body
 
   const updateData: Record<string, unknown> = {}
-  if (name !== undefined) updateData.name = name
-  if (description !== undefined) updateData.description = description
-  if (tracked !== undefined) updateData.tracked = tracked
+  if (name !== undefined) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      return badRequest('name must be a non-empty string')
+    }
+    updateData.name = name.trim()
+  }
+  if (description !== undefined) {
+    if (description !== null && typeof description !== 'string') {
+      return badRequest('description must be a string or null')
+    }
+    updateData.description = description?.trim() || null
+  }
+  if (tracked !== undefined) {
+    if (typeof tracked !== 'boolean') {
+      return badRequest('tracked must be a boolean')
+    }
+    updateData.tracked = tracked
+  }
 
   try {
     const entity = await prisma.entity.update({

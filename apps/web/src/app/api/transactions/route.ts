@@ -1,16 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
+import { badRequest, parseDateParam, parsePositiveIntParam } from '@/lib/api'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const entityId = searchParams.get('entityId') || undefined
   const filingId = searchParams.get('filingId') || undefined
   const code = searchParams.get('code') || undefined
-  const startDate = searchParams.get('startDate') || undefined
-  const endDate = searchParams.get('endDate') || undefined
-  const page = parseInt(searchParams.get('page') ?? '1')
-  const limit = parseInt(searchParams.get('limit') ?? '50')
-  const minValue = searchParams.get('minValue') ? parseFloat(searchParams.get('minValue')!) : undefined
+  let startDate: Date | undefined
+  let endDate: Date | undefined
+  let page: number
+  let limit: number
+  let minValue: number | undefined
+  try {
+    startDate = parseDateParam(searchParams, 'startDate')
+    endDate = parseDateParam(searchParams, 'endDate')
+    page = parsePositiveIntParam(searchParams, 'page', 1)
+    limit = parsePositiveIntParam(searchParams, 'limit', 50)
+    const rawMinValue = searchParams.get('minValue')
+    minValue = rawMinValue ? Number(rawMinValue) : undefined
+    if (
+      minValue !== undefined &&
+      (!Number.isFinite(minValue) || minValue < 0)
+    ) {
+      throw new Error('minValue must be a non-negative number')
+    }
+  } catch (err) {
+    return badRequest(
+      err instanceof Error ? err.message : 'Invalid query parameters',
+    )
+  }
 
   const where = {
     ...(filingId ? { filingId } : {}),
@@ -19,8 +38,8 @@ export async function GET(req: NextRequest) {
     ...(startDate || endDate
       ? {
           transactionDate: {
-            ...(startDate ? { gte: new Date(startDate) } : {}),
-            ...(endDate ? { lte: new Date(endDate) } : {}),
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
           },
         }
       : {}),

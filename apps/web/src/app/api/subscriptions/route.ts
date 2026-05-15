@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
+import {
+  badRequest,
+  FORM_TYPES,
+  isFormType,
+  isNotificationType,
+} from '@/lib/api'
 
 export async function GET() {
   const subscriptions = await prisma.subscription.findMany({
@@ -14,27 +20,43 @@ export async function POST(req: NextRequest) {
   const { type, endpoint, entityId, formTypes } = body
 
   if (!type || !endpoint) {
-    return NextResponse.json({ error: 'type and endpoint are required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'type and endpoint are required' },
+      { status: 400 },
+    )
   }
 
-  if (!['NTFY', 'EMAIL'].includes(type)) {
-    return NextResponse.json({ error: 'type must be NTFY or EMAIL' }, { status: 400 })
+  if (typeof endpoint !== 'string' || endpoint.trim().length === 0) {
+    return badRequest('endpoint must be a non-empty string')
+  }
+
+  if (!isNotificationType(type)) {
+    return badRequest('type must be NTFY or EMAIL')
   }
 
   if (type === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(endpoint)) {
-    return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
+    return badRequest('Invalid email address')
   }
 
-  const resolvedFormTypes: string[] =
+  if (
+    formTypes !== undefined &&
+    (!Array.isArray(formTypes) || !formTypes.every(isFormType))
+  ) {
+    return badRequest(
+      'formTypes must contain only FORM_4, FORM_13F, or SCHEDULE_13DG',
+    )
+  }
+
+  const resolvedFormTypes =
     Array.isArray(formTypes) && formTypes.length > 0
       ? formTypes
-      : ['FORM_4', 'FORM_13F', 'SCHEDULE_13DG']
+      : [...FORM_TYPES]
 
   try {
     const subscription = await prisma.subscription.create({
       data: {
         type,
-        endpoint,
+        endpoint: endpoint.trim(),
         entityId: entityId || null,
         formTypes: resolvedFormTypes,
         active: true,
