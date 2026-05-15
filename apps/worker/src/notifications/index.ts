@@ -24,6 +24,19 @@ export interface FilingWithEntity {
   }>
 }
 
+function stripHeaderNewlines(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim()
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function formTypeLabel(ft: FormType): string {
   switch (ft) {
     case FormType.FORM_4:
@@ -83,8 +96,8 @@ function buildEmailHtml(filing: FilingWithEntity): string {
       return `
         <tr>
           <td style="padding:4px 8px;border:1px solid #ddd">${t.transactionDate.toISOString().split('T')[0]}</td>
-          <td style="padding:4px 8px;border:1px solid #ddd">${t.transactionCode}</td>
-          <td style="padding:4px 8px;border:1px solid #ddd">${t.securityTitle}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd">${escapeHtml(t.transactionCode)}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd">${escapeHtml(t.securityTitle)}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${shares.toLocaleString()}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${price != null ? '$' + price.toFixed(2) : '—'}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${total != null ? '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}</td>
@@ -99,12 +112,12 @@ function buildEmailHtml(filing: FilingWithEntity): string {
 
   return `
     <html><body style="font-family:sans-serif;max-width:700px;margin:0 auto">
-      <h2>New ${formTypeLabel(filing.formType)} Filing</h2>
+      <h2>New ${escapeHtml(formTypeLabel(filing.formType))} Filing</h2>
       <table style="border-collapse:collapse;width:100%;margin-bottom:12px">
-        <tr><th style="text-align:left;padding:4px 8px">Entity</th><td style="padding:4px 8px">${filing.entity.name}</td></tr>
-        <tr><th style="text-align:left;padding:4px 8px">Accession</th><td style="padding:4px 8px"><code>${filing.accessionNumber}</code></td></tr>
+        <tr><th style="text-align:left;padding:4px 8px">Entity</th><td style="padding:4px 8px">${escapeHtml(filing.entity.name)}</td></tr>
+        <tr><th style="text-align:left;padding:4px 8px">Accession</th><td style="padding:4px 8px"><code>${escapeHtml(filing.accessionNumber)}</code></td></tr>
         <tr><th style="text-align:left;padding:4px 8px">Filed</th><td style="padding:4px 8px">${filing.filedAt.toISOString().split('T')[0]}</td></tr>
-        ${filing.issuerName ? `<tr><th style="text-align:left;padding:4px 8px">Issuer</th><td style="padding:4px 8px">${filing.issuerName}${filing.issuerTicker ? ` (${filing.issuerTicker})` : ''}</td></tr>` : ''}
+        ${filing.issuerName ? `<tr><th style="text-align:left;padding:4px 8px">Issuer</th><td style="padding:4px 8px">${escapeHtml(filing.issuerName)}${filing.issuerTicker ? ` (${escapeHtml(filing.issuerTicker)})` : ''}</td></tr>` : ''}
       </table>
       ${
         filing.transactions.length > 0
@@ -160,7 +173,9 @@ export async function notifyNewFiling(filing: FilingWithEntity): Promise<void> {
       sub.formTypes.length === 0 || sub.formTypes.includes(filing.formType),
   )
 
-  const title = `New ${formTypeLabel(filing.formType)}: ${filing.entity.name}`
+  const title = stripHeaderNewlines(
+    `New ${formTypeLabel(filing.formType)}: ${filing.entity.name}`,
+  )
 
   await Promise.allSettled(
     relevant.map(async (sub) => {

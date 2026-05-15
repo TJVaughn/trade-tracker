@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
-import { badRequest, isFormType } from '@/lib/api'
+import { badRequest, isFormType, parseJsonBody, requireObjectBody } from '@/lib/api'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -8,7 +8,13 @@ interface RouteContext {
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const { id } = await params
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = requireObjectBody(await parseJsonBody(req))
+  } catch (err) {
+    return badRequest(err instanceof Error ? err.message : 'Invalid request body')
+  }
+
   const { active, formTypes } = body
 
   const updateData: Record<string, unknown> = {}

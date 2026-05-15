@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const FORM_TYPES = ['FORM_4', 'FORM_13F', 'SCHEDULE_13DG'] as const
 export const ENTITY_TYPES = ['PERSON', 'COMPANY'] as const
 export const NOTIFICATION_TYPES = ['NTFY', 'EMAIL'] as const
+
+export const MAX_TEXT_LENGTH = 512
+export const MAX_DESCRIPTION_LENGTH = 2_000
+export const NTFY_TOPIC_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 export type FormTypeValue = (typeof FORM_TYPES)[number]
 export type EntityTypeValue = (typeof ENTITY_TYPES)[number]
@@ -21,6 +25,84 @@ export function isNotificationType(value: unknown): value is NotificationTypeVal
     typeof value === 'string' &&
     NOTIFICATION_TYPES.includes(value as NotificationTypeValue)
   )
+}
+
+export async function parseJsonBody(req: NextRequest): Promise<unknown> {
+  try {
+    return await req.json()
+  } catch {
+    throw new Error('Request body must be valid JSON')
+  }
+}
+
+export function requireObjectBody(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error('Request body must be a JSON object')
+  }
+  return body as Record<string, unknown>
+}
+
+export function normalizeRequiredString(
+  value: unknown,
+  name: string,
+  maxLength = MAX_TEXT_LENGTH,
+): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${name} must be a string`)
+  }
+
+  const trimmed = value.trim()
+  if (trimmed.length === 0) {
+    throw new Error(`${name} must be a non-empty string`)
+  }
+  if (trimmed.length > maxLength) {
+    throw new Error(`${name} must be ${maxLength} characters or fewer`)
+  }
+
+  return trimmed
+}
+
+export function normalizeOptionalString(
+  value: unknown,
+  name: string,
+  maxLength = MAX_DESCRIPTION_LENGTH,
+): string | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (typeof value !== 'string') {
+    throw new Error(`${name} must be a string or null`)
+  }
+
+  const trimmed = value.trim()
+  if (trimmed.length > maxLength) {
+    throw new Error(`${name} must be ${maxLength} characters or fewer`)
+  }
+
+  return trimmed || null
+}
+
+export function normalizeEmailAddress(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.length > 254) {
+    throw new Error('Invalid email address')
+  }
+  if (/\r|\n/.test(trimmed)) {
+    throw new Error('Invalid email address')
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    throw new Error('Invalid email address')
+  }
+  return trimmed
+}
+
+export function normalizeNtfyTopic(value: string): string {
+  const trimmed = value.trim()
+  if (!NTFY_TOPIC_PATTERN.test(trimmed)) {
+    throw new Error(
+      'ntfy topic must be 1-64 characters using only letters, numbers, underscores, or hyphens',
+    )
+  }
+  return trimmed
 }
 
 export function parsePositiveIntParam(

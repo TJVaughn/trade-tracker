@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@trade-tracker/db'
-import { badRequest } from '@/lib/api'
+import {
+  badRequest,
+  normalizeOptionalString,
+  normalizeRequiredString,
+  parseJsonBody,
+  requireObjectBody,
+} from '@/lib/api'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -32,21 +38,29 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const { id } = await params
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = requireObjectBody(await parseJsonBody(req))
+  } catch (err) {
+    return badRequest(err instanceof Error ? err.message : 'Invalid request body')
+  }
+
   const { name, description, tracked } = body
 
   const updateData: Record<string, unknown> = {}
   if (name !== undefined) {
-    if (typeof name !== 'string' || name.trim().length === 0) {
-      return badRequest('name must be a non-empty string')
+    try {
+      updateData.name = normalizeRequiredString(name, 'name')
+    } catch (err) {
+      return badRequest(err instanceof Error ? err.message : 'Invalid name')
     }
-    updateData.name = name.trim()
   }
   if (description !== undefined) {
-    if (description !== null && typeof description !== 'string') {
-      return badRequest('description must be a string or null')
+    try {
+      updateData.description = normalizeOptionalString(description, 'description')
+    } catch (err) {
+      return badRequest(err instanceof Error ? err.message : 'Invalid description')
     }
-    updateData.description = description?.trim() || null
   }
   if (tracked !== undefined) {
     if (typeof tracked !== 'boolean') {
