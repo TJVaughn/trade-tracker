@@ -10,7 +10,7 @@
   "dependencies": {
     "@trade-tracker/db": "workspace:*",
     "axios": "^1.7.0",
-    "fast-xml-parser": "^4.4.0",
+    "fast-xml-parser": "^5.7.0",
     "nodemailer": "^6.9.0",
     "node-cron": "^3.0.3",
     "dotenv": "^16.4.0",
