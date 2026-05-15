@@ -5,6 +5,7 @@ import {
   isFormType,
   parseDateParam,
   parsePositiveIntParam,
+  type FormTypeValue,
 } from '@/lib/api'
 
 export async function GET(req: NextRequest) {
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   const where = {
     ...(entityId ? { entityId } : {}),
-    ...(formType ? { formType } : {}),
+    ...(formType ? { formType: formType as FormTypeValue } : {}),
     ...(startDate || endDate
       ? {
           filedAt: {

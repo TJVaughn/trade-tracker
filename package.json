@@ -5,10 +5,11 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm --parallel --filter './apps/*' dev",
-    "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
+    "build": "NODE_ENV=production pnpm --filter './packages/*' build && NODE_ENV=production pnpm --filter './apps/*' build",
     "db:generate": "pnpm --filter @trade-tracker/db generate",
     "db:migrate": "pnpm --filter @trade-tracker/db migrate:dev",
     "db:studio": "pnpm --filter @trade-tracker/db studio",
+    "start": "NODE_ENV=production pnpm --filter '@trade-tracker/web' exec next start -p 3001",
     "worker": "pnpm --filter @trade-tracker/worker start"
   },
   "devDependencies": {
