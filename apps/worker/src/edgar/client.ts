@@ -140,6 +140,40 @@ export class EdgarClient {
   }
 
   /**
+   * Fetch the filing index page and return the filename of the INFORMATION TABLE
+   * document (used for 13F filings, which split cover sheet and holdings into
+   * separate documents). Returns null if no info table is found.
+   */
+  async getInfoTableFilename(
+    cik: string,
+    accessionNumber: string,
+  ): Promise<string | null> {
+    await this.throttle()
+    const numericCik = cik.replace(/^0+/, '') || '0'
+    const normalizedAccession = this.normalizeAccession(accessionNumber)
+    const dashedAccession = accessionNumber.replace(/^(\d{10})-?(\d{2})-?(\d{6})$/, '$1-$2-$3')
+    const indexUrl = `/Archives/edgar/data/${numericCik}/${normalizedAccession}/${dashedAccession}-index.htm`
+    const response = await this.archiveClient.get<string>(indexUrl, {
+      responseType: 'text',
+    })
+    const html: string = response.data
+
+    // Find all hrefs pointing to XML files in the accession root (no xsl* subdir)
+    // The index lists each doc twice: once with xsl prefix (HTML view) and once raw.
+    const hrefRe = /href="\/Archives\/edgar\/data\/[^"]+\/([^/"][^"]*\.xml)"/gi
+    let match: RegExpExecArray | null
+    const candidates: string[] = []
+    while ((match = hrefRe.exec(html)) !== null) {
+      const filename = match[1]
+      // Skip the cover sheet and any xsl-prefixed paths
+      if (filename !== 'primary_doc.xml' && !filename.startsWith('xsl')) {
+        candidates.push(filename)
+      }
+    }
+    return candidates[0] ?? null
+  }
+
+  /**
    * Search EFTS for recent filings by form type.
    * https://efts.sec.gov/LATEST/search-index?q=&forms=4&dateRange=custom&startdt=...&enddt=...
    */

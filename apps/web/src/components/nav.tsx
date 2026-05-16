@@ -6,6 +6,7 @@ import { TrendingUp } from 'lucide-react'
 
 const links = [
   { href: '/', label: 'Dashboard' },
+  { href: '/buys', label: 'Buys' },
   { href: '/entities', label: 'Entities' },
   { href: '/filings', label: 'Filings' },
   { href: '/subscriptions', label: 'Subscriptions' },

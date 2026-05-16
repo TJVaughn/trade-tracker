@@ -16,21 +16,29 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const sevenDaysAgo = subDays(new Date(), 7)
-  const fourteenDaysAgo = subDays(new Date(), 14)
+  const thirtyDaysAgo = subDays(new Date(), 30)
 
   const [
     trackedEntitiesCount,
     filingsThisWeekCount,
+    filingsThisMonthCount,
     transactionsThisWeek,
-    buyAgg,
-    sellAgg,
+    transactionsThisMonth,
+    buyAggWeek,
+    sellAggWeek,
+    buyAggMonth,
+    sellAggMonth,
     recentTransactions,
     rawDailyData,
   ] = await Promise.all([
     prisma.entity.count({ where: { tracked: true } }),
     prisma.filing.count({ where: { filedAt: { gte: sevenDaysAgo } } }),
+    prisma.filing.count({ where: { filedAt: { gte: thirtyDaysAgo } } }),
     prisma.transaction.count({
       where: { filing: { filedAt: { gte: sevenDaysAgo } } },
+    }),
+    prisma.transaction.count({
+      where: { filing: { filedAt: { gte: thirtyDaysAgo } } },
     }),
     prisma.transaction.aggregate({
       where: {
@@ -48,6 +56,22 @@ export default async function DashboardPage() {
       },
       _sum: { totalValue: true },
     }),
+    prisma.transaction.aggregate({
+      where: {
+        transactionCode: { in: ['P', 'A', 'M'] },
+        filing: { filedAt: { gte: thirtyDaysAgo } },
+        totalValue: { not: null },
+      },
+      _sum: { totalValue: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        transactionCode: { in: ['S', 'D'] },
+        filing: { filedAt: { gte: thirtyDaysAgo } },
+        totalValue: { not: null },
+      },
+      _sum: { totalValue: true },
+    }),
     prisma.transaction.findMany({
       take: 20,
       orderBy: { transactionDate: 'desc' },
@@ -59,7 +83,7 @@ export default async function DashboardPage() {
     }),
     prisma.transaction.findMany({
       where: {
-        transactionDate: { gte: fourteenDaysAgo },
+        transactionDate: { gte: thirtyDaysAgo },
         totalValue: { not: null },
       },
       select: {
@@ -70,9 +94,9 @@ export default async function DashboardPage() {
     }),
   ])
 
-  // Build 14-day volume chart data
+  // Build 30-day volume chart data
   const volumeMap = new Map<string, { buyVolume: number; sellVolume: number }>()
-  for (let i = 13; i >= 0; i--) {
+  for (let i = 29; i >= 0; i--) {
     const d = format(subDays(new Date(), i), 'MMM d')
     volumeMap.set(d, { buyVolume: 0, sellVolume: 0 })
   }
@@ -95,8 +119,10 @@ export default async function DashboardPage() {
     sellVolume: vals.sellVolume,
   }))
 
-  const buyTotal = buyAgg._sum.totalValue ? Number(buyAgg._sum.totalValue) : 0
-  const sellTotal = sellAgg._sum.totalValue ? Number(sellAgg._sum.totalValue) : 0
+  const buyTotalWeek = buyAggWeek._sum.totalValue ? Number(buyAggWeek._sum.totalValue) : 0
+  const sellTotalWeek = sellAggWeek._sum.totalValue ? Number(sellAggWeek._sum.totalValue) : 0
+  const buyTotalMonth = buyAggMonth._sum.totalValue ? Number(buyAggMonth._sum.totalValue) : 0
+  const sellTotalMonth = sellAggMonth._sum.totalValue ? Number(sellAggMonth._sum.totalValue) : 0
 
   // Serialize transactions for client
   const serializedTransactions = recentTransactions.map((tx) => ({
@@ -138,29 +164,32 @@ export default async function DashboardPage() {
 
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 font-medium">Filings This Week</CardTitle>
+            <CardTitle className="text-sm text-gray-400 font-medium">Filings</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-100">{filingsThisWeekCount.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-100">{filingsThisMonthCount.toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">30d &nbsp;·&nbsp; <span className="text-gray-400">{filingsThisWeekCount.toLocaleString()} this week</span></p>
           </CardContent>
         </Card>
 
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 font-medium">Transactions This Week</CardTitle>
+            <CardTitle className="text-sm text-gray-400 font-medium">Transactions</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-gray-100">{transactionsThisWeek.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-100">{transactionsThisMonth.toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">30d &nbsp;·&nbsp; <span className="text-gray-400">{transactionsThisWeek.toLocaleString()} this week</span></p>
           </CardContent>
         </Card>
 
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-400 font-medium">Buy / Sell Value This Week</CardTitle>
+            <CardTitle className="text-sm text-gray-400 font-medium">Buy / Sell Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-bold text-green-400">{formatCurrency(buyTotal)}</p>
-            <p className="text-lg font-bold text-red-400">{formatCurrency(sellTotal)}</p>
+            <p className="text-lg font-bold text-green-400">{formatCurrency(buyTotalMonth)}</p>
+            <p className="text-lg font-bold text-red-400">{formatCurrency(sellTotalMonth)}</p>
+            <p className="text-xs text-gray-500 mt-1">30d &nbsp;·&nbsp; <span className="text-gray-400">{formatCurrency(buyTotalWeek)} / {formatCurrency(sellTotalWeek)} this week</span></p>
           </CardContent>
         </Card>
       </div>
@@ -168,7 +197,7 @@ export default async function DashboardPage() {
       {/* Volume Chart */}
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-gray-100">14-Day Trade Volume</CardTitle>
+          <CardTitle className="text-gray-100">30-Day Trade Volume</CardTitle>
         </CardHeader>
         <CardContent>
           <VolumeChart data={volumeData} />

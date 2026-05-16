@@ -79,7 +79,12 @@ export async function pollEntity(entity: Entity): Promise<void> {
     if (filedAt < cutoff) continue
 
     const accessionNumber = recent.accessionNumber[i]
-    const primaryDocument = recent.primaryDocument[i]
+    const primaryDocumentRaw = recent.primaryDocument[i]
+    // EDGAR submissions sometimes returns "xslF345X06/form4.xml" or
+    // "xslForm13F_X02/primary_doc.xml" — fetching that path returns a rendered
+    // HTML view rather than raw XML. Strip the leading xsl*/ directory so we
+    // always fetch the raw XML file.
+    const primaryDocument = primaryDocumentRaw.replace(/^xsl[^/]+\//i, '')
     const reportDateStr = recent.reportDate[i]
     const periodOfReport = reportDateStr
       ? new Date(reportDateStr + 'T00:00:00.000Z')
@@ -110,13 +115,32 @@ export async function pollEntity(entity: Entity): Promise<void> {
       },
     })
 
+    // For 13F filings the primaryDocument is the cover sheet; the actual holdings
+    // live in a separate INFORMATION TABLE document in the same accession.
+    let fetchDocument = primaryDocument
+    if (formType === FormType.FORM_13F) {
+      try {
+        const infoTableFilename = await edgarClient.getInfoTableFilename(
+          entity.cik,
+          accessionNumber,
+        )
+        if (infoTableFilename) {
+          fetchDocument = infoTableFilename
+        } else {
+          console.warn(`[poller] No info table found for 13F ${accessionNumber}, falling back to primary doc`)
+        }
+      } catch (err) {
+        console.warn(`[poller] Could not fetch index for ${accessionNumber}:`, err instanceof Error ? err.message : err)
+      }
+    }
+
     // Fetch the document
     let rawDoc: string
     try {
       rawDoc = await edgarClient.getFilingDocument(
         entity.cik,
         accessionNumber,
-        primaryDocument,
+        fetchDocument,
       )
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

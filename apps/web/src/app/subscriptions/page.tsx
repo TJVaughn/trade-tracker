@@ -200,7 +200,7 @@ export default function SubscriptionsPage() {
             {/* Endpoint */}
             <div className="space-y-1.5">
               <Label htmlFor="endpoint" className="text-gray-300">
-                {subType === 'NTFY' ? 'ntfy.sh Topic URL' : 'Email Address'}
+                {subType === 'NTFY' ? 'ntfy.sh Topic Name' : 'Email Address'}
               </Label>
               <Input
                 id="endpoint"
@@ -209,7 +209,7 @@ export default function SubscriptionsPage() {
                 onChange={(e) => setEndpoint(e.target.value)}
                 placeholder={
                   subType === 'NTFY'
-                    ? 'https://ntfy.sh/your-topic'
+                    ? 'your-topic-name'
                     : 'you@example.com'
                 }
                 required
